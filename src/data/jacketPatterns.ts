@@ -148,13 +148,15 @@ export function draftBackPanel(m: BodyMeasurements, ease: Ease, style?: JacketSt
     const cbHem: Vec2 = [0, Y_hem];
     ventTail = [`L ${fmtPt(SHM)}`, `L ${fmtPt(cbHem)}`, `L ${fmtPt(CBS)}`];
   } else if (ventStyle === 'side_vents') {
-    const sTop: Vec2  = [hipX,      Y_vent];
-    const sExt: Vec2  = [hipX + 4,  Y_vent];
-    const sBot: Vec2  = [hipX + 4,  Y_hem];
-    const cbHem: Vec2 = [0,         Y_hem];
+    // Vent opens at the side seam; must start AT or BELOW the hip point
+    const Y_ventSide = Math.max(Y_hip, Y_vent);
+    const sStart: Vec2 = [hipX,     Y_ventSide];
+    const sExt:   Vec2 = [hipX + 4, Y_ventSide];
+    const sBot:   Vec2 = [hipX + 4, Y_hem];
+    const cbHem:  Vec2 = [0,        Y_hem];
     ventTail = [
-      `L ${fmtPt(sTop)}`, `L ${fmtPt(sExt)}`, `L ${fmtPt(sBot)}`,
-      `L ${fmtPt(cbHem)}`, `L ${fmtPt(CBS)}`,
+      `L ${fmtPt(sStart)}`, `L ${fmtPt(sExt)}`, `L ${fmtPt(sBot)}`,
+      `L ${fmtPt(cbHem)}`,  `L ${fmtPt(CBS)}`,
     ];
   } else {
     // center_vent (default)
@@ -421,8 +423,75 @@ export function draftCollar(m: BodyMeasurements, _ease: Ease, style?: JacketStyl
 }
 
 // ─────────────────────────────────────────────
-//  Master function: Draft all jacket pieces
+//  6. VENT UNDERLAP
+//  Separate facing piece placed behind the vent opening.
+//  • center_vent → one rectangular underlap at CB, 4 cm wide
+//  • side_vents  → two identical side underlaps (label: cut 2)
+//  Returns [] when backVent === 'no_vent'.
 // ─────────────────────────────────────────────
+export function draftVentUnderlap(m: BodyMeasurements, style?: JacketStyleOptions): PatternPiece[] {
+  const ventStyle = style?.backVent ?? 'center_vent';
+  if (ventStyle === 'no_vent') return [];
+
+  const Y_hem       = m.jacketLength;
+  const Y_ventBase  = Y_hem - 15;             // vent depth: 15 cm from hem
+  const Y_hip       = m.backLength + 18;
+  const hipX        = (m.hips + JACKET_EASE.hips) / 4;
+
+  if (ventStyle === 'center_vent') {
+    const lapW = 4;                           // underlap width = 4 cm
+    const lapH = Y_hem - Y_ventBase;          // vent depth height
+
+    // Rectangle: fold/CB edge at x=0, slit edge at x=lapW
+    const TL: Vec2 = [0,    0];
+    const TR: Vec2 = [lapW, 0];
+    const BR: Vec2 = [lapW, lapH];
+    const BL: Vec2 = [0,    lapH];
+
+    const svgPath = [
+      `M ${fmtPt(TL)}`, `L ${fmtPt(TR)}`,
+      `L ${fmtPt(BR)}`, `L ${fmtPt(BL)}`, 'Z',
+    ].join(' ');
+
+    return [{
+      id:            'jacket_vent_underlap',
+      name:          'Center Vent Underlap',
+      baseSize:      'L',
+      svgPath,
+      grainLine:     { x1: lapW / 2, y1: 2, x2: lapW / 2, y2: lapH - 2 },
+      keyPoints:     [],
+      seamAllowance: 1.0,
+    }];
+  }
+
+  // side_vents: two mirror underlaps at the side seam
+  const Y_ventSide = Math.max(Y_hip, Y_ventBase);
+  const lapW = 4;
+  const lapH = Y_hem - Y_ventSide;
+
+  const TL: Vec2 = [0,    0];
+  const TR: Vec2 = [lapW, 0];
+  const BR: Vec2 = [lapW, lapH];
+  const BL: Vec2 = [0,    lapH];
+  const _ = hipX;  // suppress unused-variable warning
+  void _;
+
+  const svgPath = [
+    `M ${fmtPt(TL)}`, `L ${fmtPt(TR)}`,
+    `L ${fmtPt(BR)}`, `L ${fmtPt(BL)}`, 'Z',
+  ].join(' ');
+
+  const piece: PatternPiece = {
+    id:            'jacket_side_vent_underlap',
+    name:          'Side Vent Underlap (Cut 2)',
+    baseSize:      'L',
+    svgPath,
+    grainLine:     { x1: lapW / 2, y1: 2, x2: lapW / 2, y2: lapH - 2 },
+    keyPoints:     [],
+    seamAllowance: 1.0,
+  };
+  return [piece];  // one piece object, labelled 'cut 2'
+}
 export function draftAllJacketPieces(m: BodyMeasurements, style?: JacketStyleOptions): PatternPiece[] {
   const ease        = JACKET_EASE;
   const sleeveStyle = style?.sleeveStyle ?? 'two_piece_sleeve';
@@ -441,6 +510,10 @@ export function draftAllJacketPieces(m: BodyMeasurements, style?: JacketStyleOpt
   // Collar piece omitted when 'no_collar' is selected
   const collar = draftCollar(m, ease, style);
   if (collar !== null) pieces.push(collar);
+
+  // Vent underlap(s) — separate construction piece(s)
+  const underlaps = draftVentUnderlap(m, style);
+  pieces.push(...underlaps);
 
   return pieces;
 }
