@@ -1,0 +1,4 @@
+/* App-level overrides — Tailwind handles layout/styling */
+#root {
+  min-height: 100vh;
+}
