@@ -9,6 +9,7 @@ import type { BodyMeasurements, BaseSize } from '../../types/measurements.types'
 import type { AdjustedPatternPiece, AdjustmentReport, PatternAdjustmentEntry } from '../../types/pattern.types';
 import { STANDARD_SIZES } from '../../data/standardSizes';
 import { draftAllJacketPieces, MEASUREMENT_LABELS } from '../../data/jacketPatterns';
+import type { JacketStyleOptions } from '../../types/style.types';
 
 // ─────────────────────────────────────────────
 //  computeAdjustedPieces
@@ -21,12 +22,13 @@ import { draftAllJacketPieces, MEASUREMENT_LABELS } from '../../data/jacketPatte
 export function computeAdjustedPieces(
   userMeasurements: BodyMeasurements,
   baseSize: BaseSize = 'L',
+  style?: JacketStyleOptions,
 ): AdjustedPatternPiece[] {
   const baseMeasurements = STANDARD_SIZES[baseSize] as BodyMeasurements;
 
-  // Draft both sets of pieces
-  const basePieces = draftAllJacketPieces(baseMeasurements);
-  const userPieces = draftAllJacketPieces(userMeasurements);
+  // Draft both sets with the same style so piece counts match
+  const basePieces = draftAllJacketPieces(baseMeasurements, style);
+  const userPieces = draftAllJacketPieces(userMeasurements, style);
 
   return basePieces.map((basePiece, idx) => {
     const userPiece = userPieces[idx];
@@ -72,8 +74,9 @@ export function computeAdjustedPieces(
 export function buildAdjustmentReport(
   userMeasurements: BodyMeasurements,
   baseSize: BaseSize = 'L',
+  style?: JacketStyleOptions,
 ): AdjustmentReport {
-  const adjusted = computeAdjustedPieces(userMeasurements, baseSize);
+  const adjusted = computeAdjustedPieces(userMeasurements, baseSize, style);
 
   return {
     pieces: adjusted.map((p) => ({

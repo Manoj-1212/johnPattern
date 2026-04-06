@@ -45,13 +45,15 @@ interface SceneProps {
 function MannequinScene({ color, orbitRef, pendingView, onViewApplied, showOverlay }: SceneProps) {
   const measurements   = useAppStore((s) => s.measurements);
   const wireframe      = useAppStore((s) => s.mannequinWireframe);
+  const styleOptions   = useAppStore((s) => s.styleOptions);
+  const baseSize       = useAppStore((s) => s.baseSize);
   const { dims }       = useMorphController(measurements);
   const { camera }     = useThree();
 
   // Compute pattern pieces only when the overlay is active
   const overlayPieces = useMemo(
-    () => (showOverlay ? computeAdjustedPieces(measurements) : []),
-    [showOverlay, measurements],
+    () => (showOverlay ? computeAdjustedPieces(measurements, baseSize, styleOptions) : []),
+    [showOverlay, measurements, baseSize, styleOptions],
   );
   // Apply view preset via animation each frame
   useFrame(() => {

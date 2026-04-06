@@ -12,6 +12,7 @@ import type { PatternPiece, PatternKeyPoint } from '../types/pattern.types';
 import { JACKET_EASE } from './standardSizes';
 import { fmtPt } from '../utils/patternMath';
 import type { Vec2 } from '../utils/patternMath';
+import type { JacketStyleOptions } from '../types/style.types';
 
 type Ease = typeof JACKET_EASE;
 
@@ -27,7 +28,7 @@ const h2 = (circ: number, ease: number) => (circ + ease) / 2;
 //  1. FRONT BODY PANEL
 //  (Left panel — from center front to side seam)
 // ─────────────────────────────────────────────
-export function draftFrontPanel(m: BodyMeasurements, ease: Ease): PatternPiece {
+export function draftFrontPanel(m: BodyMeasurements, ease: Ease, style?: JacketStyleOptions): PatternPiece {
   // ── X positions (from CF = 0, measured rightward) ──
   const nw = m.neck / 5;                     // front neck width (CF to shoulder-neck pt)
   const shoulderX = m.shoulderWidth / 2;     // shoulder point X
@@ -49,9 +50,14 @@ export function draftFrontPanel(m: BodyMeasurements, ease: Ease): PatternPiece {
   const SW:  Vec2  = [waistX,     Y_waist];    // Side seam at Waist
   const SH:  Vec2  = [hipX,       Y_hip];      // Side seam at Hip
   const SHM: Vec2  = [hipX,       Y_hem];      // Side seam at Hem
-  const FHC: Vec2  = [nw - 2,     Y_hem + 2];  // Front Hem Corner (front edge)
-  const CFW: Vec2  = [0,          Y_waist + 2]; // CF at button level
-  const FNP: Vec2  = [0,          nd];          // Front Neck Point (CF at neck depth)
+  // Style: double-breasted adds ~5 cm button extension beyond CF
+  const btnStyle   = style?.buttonConfig?.style;
+  const isDoubleBr = btnStyle === 'double_breasted_4btn' || btnStyle === 'double_breasted_6btn';
+  const cfExt      = isDoubleBr ? 5 : 0;
+
+  const FHC: Vec2  = [nw - 2 - cfExt, Y_hem + 2];      // Front Hem Corner
+  const CFW: Vec2  = [-cfExt,          Y_waist + 2];    // Button extension / CF edge
+  const FNP: Vec2  = [0,               nd];              // Front Neck Point (stays at CF)
 
   // ── Bezier control points ──
   // Armhole: from SP down to AHB (concave shoulder scoop, then convex lower)
@@ -89,7 +95,7 @@ export function draftFrontPanel(m: BodyMeasurements, ease: Ease): PatternPiece {
 
   return {
     id: 'jacket_front',
-    name: 'Front Panel',
+    name: isDoubleBr ? 'Front Panel (Double Breasted)' : 'Front Panel',
     baseSize: 'L',
     svgPath,
     grainLine: { x1: 4, y1: Y_ah + 4,  x2: 4, y2: Y_hem - 8 },
@@ -102,7 +108,7 @@ export function draftFrontPanel(m: BodyMeasurements, ease: Ease): PatternPiece {
 //  2. BACK BODY PANEL
 //  (From center back to side seam, with center vent)
 // ─────────────────────────────────────────────
-export function draftBackPanel(m: BodyMeasurements, ease: Ease): PatternPiece {
+export function draftBackPanel(m: BodyMeasurements, ease: Ease, style?: JacketStyleOptions): PatternPiece {
   // ── X positions ──
   const bnw      = m.neck / 6;                // back neck width (CB to BNP)
   const shoulderX = m.shoulderWidth / 2;       // shoulder point
@@ -126,10 +132,6 @@ export function draftBackPanel(m: BodyMeasurements, ease: Ease): PatternPiece {
   const SW:   Vec2 = [waistX,     Y_waist];     // Side seam Waist
   const SH:   Vec2 = [hipX,       Y_hip];       // Side seam Hip
   const SHM:  Vec2 = [hipX,       Y_hem];       // Side seam Hem
-  const HEM:  Vec2 = [4,          Y_hem];       // CB hem (slightly inset for vent fold)
-  const VHEM: Vec2 = [4,          Y_vent];      // Vent fold line at hem level (x=4)
-  const CBV:  Vec2 = [0,          Y_vent];      // Center Back at vent top
-
   // ── Bezier control points ──
   // Armhole (back): deeper concave under shoulder blade
   const AH_c1: Vec2 = [shoulderX + 1,  8];
@@ -139,6 +141,32 @@ export function draftBackPanel(m: BodyMeasurements, ease: Ease): PatternPiece {
   const BN_c1: Vec2 = [bnw * 0.4,  bnd * 0.5];
   const BN_c2: Vec2 = [0.5,        bnd * 0.8];
 
+  // Style-driven: back hem / vent shape
+  const ventStyle = style?.backVent ?? 'center_vent';
+  let ventTail: string[];
+  if (ventStyle === 'no_vent') {
+    const cbHem: Vec2 = [0, Y_hem];
+    ventTail = [`L ${fmtPt(SHM)}`, `L ${fmtPt(cbHem)}`, `L ${fmtPt(CBS)}`];
+  } else if (ventStyle === 'side_vents') {
+    const sTop: Vec2  = [hipX,      Y_vent];
+    const sExt: Vec2  = [hipX + 4,  Y_vent];
+    const sBot: Vec2  = [hipX + 4,  Y_hem];
+    const cbHem: Vec2 = [0,         Y_hem];
+    ventTail = [
+      `L ${fmtPt(sTop)}`, `L ${fmtPt(sExt)}`, `L ${fmtPt(sBot)}`,
+      `L ${fmtPt(cbHem)}`, `L ${fmtPt(CBS)}`,
+    ];
+  } else {
+    // center_vent (default)
+    const HEM:  Vec2 = [4, Y_hem];
+    const VHEM: Vec2 = [4, Y_vent];
+    const CBV:  Vec2 = [0, Y_vent];
+    ventTail = [
+      `L ${fmtPt(SHM)}`, `L ${fmtPt(HEM)}`, `L ${fmtPt(VHEM)}`,
+      `L ${fmtPt(CBV)}`, `L ${fmtPt(CBS)}`,
+    ];
+  }
+
   const svgPath = [
     `M ${fmtPt(CBS)}`,
     `C ${fmtPt(BN_c2)} ${fmtPt(BN_c1)} ${fmtPt(BNP)}`,
@@ -146,11 +174,7 @@ export function draftBackPanel(m: BodyMeasurements, ease: Ease): PatternPiece {
     `C ${fmtPt(AH_c1)} ${fmtPt(AH_c2)} ${fmtPt(AHB)}`,
     `L ${fmtPt(SW)}`,
     `L ${fmtPt(SH)}`,
-    `L ${fmtPt(SHM)}`,
-    `L ${fmtPt(HEM)}`,
-    `L ${fmtPt(VHEM)}`,
-    `L ${fmtPt(CBV)}`,
-    `L ${fmtPt(CBS)}`,
+    ...ventTail,
     'Z',
   ].join(' ');
 
@@ -167,7 +191,9 @@ export function draftBackPanel(m: BodyMeasurements, ease: Ease): PatternPiece {
 
   return {
     id: 'jacket_back',
-    name: 'Back Panel',
+    name: ventStyle === 'side_vents' ? 'Back Panel (Side Vents)'
+        : ventStyle === 'no_vent'    ? 'Back Panel (No Vent)'
+        : 'Back Panel (Center Vent)',
     baseSize: 'L',
     svgPath,
     grainLine: { x1: 3, y1: Y_ah + 4, x2: 3, y2: Y_hem - 10 },
@@ -180,7 +206,7 @@ export function draftBackPanel(m: BodyMeasurements, ease: Ease): PatternPiece {
 //  3. SLEEVE — UPPER
 //  (The larger sleeve piece with cap curve)
 // ─────────────────────────────────────────────
-export function draftSleeveUpper(m: BodyMeasurements, ease: Ease): PatternPiece {
+export function draftSleeveUpper(m: BodyMeasurements, ease: Ease, style?: JacketStyleOptions): PatternPiece {
   const uaHalf  = h2(m.upperArmCircumference, ease.upperArmCircumference) / 2;
   const elHalf  = m.elbowCircumference / 2;
   const wrHalf  = m.wristCircumference / 2;
@@ -240,7 +266,8 @@ export function draftSleeveUpper(m: BodyMeasurements, ease: Ease): PatternPiece 
 
   return {
     id: 'jacket_sleeve_upper',
-    name: 'Sleeve Upper',
+    name: (style?.sleeveStyle === 'one_piece_sleeve' || style?.sleeveStyle === 'raglan_sleeve')
+      ? 'Sleeve (One Piece)' : 'Sleeve Upper',
     baseSize: 'L',
     svgPath,
     grainLine: { x1: capTopX, y1: capH + 8, x2: capTopX, y2: Y_total - 8 },
@@ -308,36 +335,68 @@ export function draftSleeveUnder(m: BodyMeasurements, ease: Ease): PatternPiece 
 }
 
 // ─────────────────────────────────────────────
-//  5. COLLAR (Notched Lapel Style)
-//  (Collar stand + fall in one piece)
+//  5. COLLAR
+//  Shape and height adapt to the selected collar type.
+//  Returns null for 'no_collar'.
 // ─────────────────────────────────────────────
-export function draftCollar(m: BodyMeasurements, _ease: Ease): PatternPiece {
-  // Collar length = approx half neck + front neck wrap
-  const collarLength = m.neck / 2 + 10;
-  const standH  = 3.5;    // collar stand height
-  const fallH   = 5;      // collar fall height
-  const totalH  = standH + fallH;
-  const curveSag = 1.2;   // how much the neckline edge bows inward
+export function draftCollar(m: BodyMeasurements, _ease: Ease, style?: JacketStyleOptions): PatternPiece | null {
+  const ct = style?.collarType ?? 'notched_lapel';
+  if (ct === 'no_collar') return null;
 
-  // ── Named vertices ──
-  // Outer edge — slightly convex
+  // ── Geometry parameters per collar type ────────────────────
+  let collarLength: number;
+  let standH: number;       // stand height (always present)
+  let fallH: number;        // fall height (0 for standing-only collars)
+  let outerConvex: number;  // outer-edge bezier Y offset (negative = bows outward)
+  let neckCurveSag: number; // neckline bezier sag inward
+  let pieceName: string;
+
+  switch (ct) {
+    case 'shawl_collar':
+      collarLength = m.neck / 2 + 14; standH = 4;   fallH = 5;
+      outerConvex = -2.5; neckCurveSag = 0.6; pieceName = 'Shawl Collar';
+      break;
+    case 'mandarin_collar':
+      collarLength = m.neck / 2 + 3;  standH = 4;   fallH = 0;
+      outerConvex = -0.3; neckCurveSag = 0.4; pieceName = 'Mandarin Collar';
+      break;
+    case 'chinese_collar':
+      collarLength = m.neck / 2 + 3;  standH = 4;   fallH = 0;
+      outerConvex = -0.3; neckCurveSag = 0.4; pieceName = 'Chinese Collar';
+      break;
+    case 'nehru_collar':
+      collarLength = m.neck / 2 + 3;  standH = 5.5; fallH = 0;
+      outerConvex = -0.4; neckCurveSag = 0.4; pieceName = 'Nehru Collar';
+      break;
+    case 'band_collar':
+      collarLength = m.neck / 2 + 2;  standH = 2.5; fallH = 0;
+      outerConvex = -0.15; neckCurveSag = 0.2; pieceName = 'Band Collar';
+      break;
+    case 'peak_lapel':
+      collarLength = m.neck / 2 + 11; standH = 3.5; fallH = 5;
+      outerConvex = -1.5; neckCurveSag = 1.2; pieceName = 'Peak Lapel Collar';
+      break;
+    default: // notched_lapel
+      collarLength = m.neck / 2 + 10; standH = 3.5; fallH = 5;
+      outerConvex = -1.0; neckCurveSag = 1.2; pieceName = 'Notched Lapel Collar';
+      break;
+  }
+
+  const totalH = standH + fallH;
+
   const OE_L: Vec2 = [0,            0];
   const OE_R: Vec2 = [collarLength, 0];
-
-  // Neckline reference (right end — used for key point)
-  const NL_R: Vec2 = [collarLength, standH];  // right neckline end
-
-  // Bottom points
-  const BT_L: Vec2 = [0,            totalH];
   const BT_R: Vec2 = [collarLength, totalH];
+  const BT_L: Vec2 = [0,            totalH];
+  const NL_R: Vec2 = [collarLength, standH]; // key-point ref
 
-  // Bezier control points for the neckline curve (concave inward)
-  const NL_c1: Vec2 = [collarLength * 0.25, standH - curveSag];
-  const NL_c2: Vec2 = [collarLength * 0.75, standH - curveSag];
+  // Neckline edge — concave inward (stand curves around neck)
+  const NL_c1: Vec2 = [collarLength * 0.25, standH - neckCurveSag];
+  const NL_c2: Vec2 = [collarLength * 0.75, standH - neckCurveSag];
 
-  // Outer edge curve (convex outward)
-  const OE_c1: Vec2 = [collarLength * 0.25, -1];
-  const OE_c2: Vec2 = [collarLength * 0.75, -1];
+  // Outer collar edge — convex (bows away from neck)
+  const OE_c1: Vec2 = [collarLength * 0.25, outerConvex];
+  const OE_c2: Vec2 = [collarLength * 0.75, outerConvex];
 
   const svgPath = [
     `M ${fmtPt(OE_L)}`,
@@ -348,20 +407,15 @@ export function draftCollar(m: BodyMeasurements, _ease: Ease): PatternPiece {
     'Z',
   ].join(' ');
 
-  // Grain line runs along the length (horizontal)
-  const grainMidY = totalH / 2;
-
-  const keyPoints: PatternKeyPoint[] = [
-    { id: 'collar_length', x: NL_R[0], y: NL_R[1], linkedMeasurement: 'neck', adjustmentAxis: 'x' },
-  ];
-
   return {
     id: 'jacket_collar',
-    name: 'Collar',
+    name: pieceName,
     baseSize: 'L',
     svgPath,
-    grainLine: { x1: 4, y1: grainMidY, x2: collarLength - 4, y2: grainMidY },
-    keyPoints,
+    grainLine: { x1: 4, y1: totalH / 2, x2: collarLength - 4, y2: totalH / 2 },
+    keyPoints: [
+      { id: 'collar_length', x: NL_R[0], y: NL_R[1], linkedMeasurement: 'neck', adjustmentAxis: 'x' },
+    ],
     seamAllowance: 1.0,
   };
 }
@@ -369,15 +423,26 @@ export function draftCollar(m: BodyMeasurements, _ease: Ease): PatternPiece {
 // ─────────────────────────────────────────────
 //  Master function: Draft all jacket pieces
 // ─────────────────────────────────────────────
-export function draftAllJacketPieces(m: BodyMeasurements): PatternPiece[] {
-  const ease = JACKET_EASE;
-  return [
-    draftFrontPanel(m, ease),
-    draftBackPanel(m, ease),
-    draftSleeveUpper(m, ease),
-    draftSleeveUnder(m, ease),
-    draftCollar(m, ease),
+export function draftAllJacketPieces(m: BodyMeasurements, style?: JacketStyleOptions): PatternPiece[] {
+  const ease        = JACKET_EASE;
+  const sleeveStyle = style?.sleeveStyle ?? 'two_piece_sleeve';
+
+  const pieces: PatternPiece[] = [
+    draftFrontPanel(m, ease, style),
+    draftBackPanel(m, ease, style),
+    draftSleeveUpper(m, ease, style),
   ];
+
+  // Two-piece sleeve includes the under-sleeve; one-piece / raglan does not
+  if (sleeveStyle === 'two_piece_sleeve') {
+    pieces.push(draftSleeveUnder(m, ease));
+  }
+
+  // Collar piece omitted when 'no_collar' is selected
+  const collar = draftCollar(m, ease, style);
+  if (collar !== null) pieces.push(collar);
+
+  return pieces;
 }
 
 // Human-readable labels for each measurement key (for adjustment report)

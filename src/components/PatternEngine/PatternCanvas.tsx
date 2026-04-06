@@ -30,6 +30,7 @@ const deltaIcon: Record<string, string> = {
 export default function PatternCanvas() {
   const measurements  = useAppStore((s) => s.measurements);
   const baseSize      = useAppStore((s) => s.baseSize);
+  const styleOptions  = useAppStore((s) => s.styleOptions);
   const setActiveView = useAppStore((s) => s.setActiveView);
   const selectedId    = useAppStore((s) => s.selectedPatternPiece);
   const setSelectedId = useAppStore((s) => s.setSelectedPatternPiece);
@@ -39,15 +40,15 @@ export default function PatternCanvas() {
   const [showCutLine, setShowCutLine] = useState(true);
   const [showKeyPoints, setShowKeyPoints] = useState(false);
 
-  // ── Compute pieces whenever measurements or baseSize change ──
+  // ── Compute pieces whenever measurements, baseSize, or style change ──
   const pieces: AdjustedPatternPiece[] = useMemo(
-    () => computeAdjustedPieces(measurements, baseSize),
-    [measurements, baseSize],
+    () => computeAdjustedPieces(measurements, baseSize, styleOptions),
+    [measurements, baseSize, styleOptions],
   );
 
   const report = useMemo(
-    () => buildAdjustmentReport(measurements, baseSize),
-    [measurements, baseSize],
+    () => buildAdjustmentReport(measurements, baseSize, styleOptions),
+    [measurements, baseSize, styleOptions],
   );
 
   // Select first piece by default
